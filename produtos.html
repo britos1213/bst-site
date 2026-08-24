@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#111318" />
+  <link rel="icon" href="assets/logo.png" />
+  <link rel="stylesheet" href="styles.css" />
+
+  <title>Produtos | Britos Soluções Tecnológicas</title>
+  <meta name="description" content="Catálogo de produtos BST." />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="container nav-wrap">
+    <a class="brand" href="index.html"><img src="assets/logo.png" alt="BST - Britos Soluções Tecnológicas"></a>
+    <button class="menu-toggle" aria-label="Abrir menu" aria-expanded="false">☰</button>
+    <nav class="nav">
+      <a href="index.html">Início</a>
+      <a href="produtos.html">Produtos</a>
+      <a href="index.html#servicos">Serviços</a>
+      <a href="index.html#empresa">Empresa</a>
+      <a href="index.html#contato">Contato</a>
+      <a class="cart-link" href="carrinho.html">Carrinho <span id="cart-count">0</span></a>
+      <a class="btn btn-dark" href="https://app.bst.inf.br" target="_blank" rel="noopener">Área do cliente</a>
+    </nav>
+  </div>
+</header>
+
+<main class="section">
+  <div class="container">
+    <span class="eyebrow">Catálogo</span>
+    <h1>Produtos</h1>
+    <p>Use a busca e os filtros para encontrar a categoria desejada.</p>
+
+    <div class="catalog-toolbar">
+      <input id="search" class="input" type="search" placeholder="Buscar produto...">
+      <select id="category" class="input">
+        <option value="">Todas as categorias</option>
+      </select>
+    </div>
+
+    <div id="catalog-grid" class="card-grid product-grid"></div>
+    <div id="catalog-empty" class="empty-state" hidden>Nenhum produto encontrado.</div>
+  </div>
+</main>
+
+<footer class="footer">
+  <div class="container footer-grid">
+    <div>
+      <img src="assets/logo.png" alt="BST">
+      <p>Britos Soluções Tecnológicas</p>
+    </div>
+    <div>
+      <strong>Contato</strong>
+      <a href="tel:+5562984939375">(62) 98493-9375</a>
+      <a href="mailto:bst@bst.inf.br">bst@bst.inf.br</a>
+      <a href="https://instagram.com/britossolucoes" target="_blank" rel="noopener">@britossolucoes</a>
+    </div>
+    <div>
+      <strong>Links</strong>
+      <a href="produtos.html">Produtos</a>
+      <a href="index.html#servicos">Serviços</a>
+      <a href="https://app.bst.inf.br" target="_blank" rel="noopener">Área do cliente</a>
+    </div>
+  </div>
+  <div class="container copyright">© <span id="year"></span> Britos Soluções Tecnológicas.</div>
+</footer>
+<a class="floating-whatsapp" href="https://wa.me/5562984939375" target="_blank" rel="noopener">WhatsApp</a>
+
+<script src="data/products.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
