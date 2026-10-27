@@ -1,4 +1,4 @@
-# BST Install - catalogo remoto, PowerShell 5.1+
+﻿# BST Install - catalogo remoto, PowerShell 5.1+
 $ErrorActionPreference = 'Stop'
 $CatalogUrl = 'https://raw.githubusercontent.com/britos1213/bst-install-public/main/programas.json'
 $DownloadDir = Join-Path $env:TEMP 'BST-Install'
@@ -1294,6 +1294,84 @@ function Menu-LimpezaBST {
     }
 }
 
+# BST Disk Health - diagnostico somente leitura, sem servidor HTTP.
+function Abrir-DiskHealthBST {
+    $pasta = Join-Path $env:LOCALAPPDATA 'BST\DiskHealth'
+    New-Item -ItemType Directory -Force -Path $pasta | Out-Null
+    $agora = Get-Date -Format 'dd/MM/yyyy HH:mm:ss'
+    $discos = @()
+    $fisicos = @(Get-CimInstance -ClassName Win32_DiskDrive -ErrorAction Stop)
+    $storage = @(Get-PhysicalDisk -ErrorAction SilentlyContinue)
+    foreach ($d in $fisicos) {
+        $sd = @($storage | Where-Object { $_.SerialNumber -and $d.SerialNumber -and $_.SerialNumber.Trim() -eq $d.SerialNumber.Trim() } | Select-Object -First 1)
+        $reliability = $null
+        if ($sd.Count -gt 0) {
+            try { $reliability = $sd[0] | Get-StorageReliabilityCounter -ErrorAction Stop } catch {}
+        }
+        $temperatura = $null; $desgaste = $null; $horas = $null; $lidos = $null; $gravados = $null
+        if ($null -ne $reliability) {
+            if ($null -ne $reliability.Temperature -and $reliability.Temperature -gt 0) { $temperatura = [int]$reliability.Temperature }
+            if ($null -ne $reliability.Wear -and $reliability.Wear -ge 0 -and $reliability.Wear -le 100) { $desgaste = [int]$reliability.Wear }
+            if ($null -ne $reliability.PowerOnHours -and $reliability.PowerOnHours -gt 0) { $horas = [long]$reliability.PowerOnHours }
+            if ($null -ne $reliability.ReadErrorsTotal) { $lidos = [long]$reliability.ReadErrorsTotal }
+            if ($null -ne $reliability.WriteErrorsTotal) { $gravados = [long]$reliability.WriteErrorsTotal }
+        }
+        $saude = if ($sd.Count -gt 0) { [string]$sd[0].HealthStatus } else { [string]$d.Status }
+        $tipo = if ($sd.Count -gt 0) { [string]$sd[0].MediaType } else { [string]$d.MediaType }
+        $discos += [pscustomobject]@{
+            modelo = [string]$d.Model; dispositivo = [string]$d.DeviceID
+            serial = [string]$d.SerialNumber; tipo = $tipo
+            capacidadeGB = [math]::Round([double]$d.Size / 1GB, 1)
+            estado = $saude; temperatura = $temperatura; desgaste = $desgaste
+            vidaRestante = if ($null -ne $desgaste) { 100 - $desgaste } else { $null }
+            horas = $horas; errosLeitura = $lidos; errosGravacao = $gravados
+        }
+    }
+    $dados = [pscustomobject]@{ geradoEm = $agora; computador = $env:COMPUTERNAME; discos = @($discos) }
+    $json = ConvertTo-Json -InputObject $dados -Depth 6 -Compress
+    # Impede que caracteres de dados locais sejam interpretados como HTML/JS.
+    $json = $json.Replace('&','\u0026').Replace('<','\u003c').Replace('>','\u003e').Replace("'",'\u0027')
+    $html = @'
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BST Disk Health</title><style>
+:root{font-family:Segoe UI,Arial,sans-serif;color:#e9edf5;background:#10151e}*{box-sizing:border-box}
+body{margin:0;padding:28px}main{max-width:1120px;margin:auto}header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{margin:0;font-size:29px}small,.muted{color:#aab4c3}.brand{color:#ff5757}button{background:#c5222d;border:0;color:white;border-radius:9px;padding:11px 16px;cursor:pointer;font-weight:600}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px;margin-top:20px}.card{background:#1a2230;border:1px solid #303b4d;border-radius:14px;padding:20px}
+h2{font-size:17px;overflow-wrap:anywhere;margin:0 0 10px}.state{font-size:13px;padding:5px 9px;border-radius:7px;background:#354153;display:inline-block}.metric{font-size:29px;font-weight:700;margin:8px 0}
+.bar{height:12px;border-radius:8px;background:#364354;overflow:hidden}.fill{height:100%;background:#2cb77a}.warn{background:#edaa36}.bad{background:#e45858}
+.meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:18px}.meta div{background:#131a25;border-radius:8px;padding:10px}.meta strong{display:block;margin-top:4px}
+.note{color:#aab4c3;font-size:13px;margin-top:20px;line-height:1.5}footer{margin-top:25px;color:#7e8b9d;font-size:12px}
+</style></head><body><main><header><div><h1><span class="brand">BST</span> Disk Health</h1><small id="subtitle"></small></div><button onclick="location.reload()">Reabrir relatório</button></header>
+<div id="grid" class="grid"></div><p class="note">Diagnóstico somente leitura. Valores ausentes são exibidos como N/D. A porcentagem de vida restante é mostrada somente quando o Windows fornece o indicador de desgaste. Para atualizar as medições, execute novamente a opção [D] no BST Install. A ferramenta não substitui backup nem diagnóstico SMART especializado.</p><footer>BRITOS SOLUÇÕES TECNOLÓGICAS — BST Install v12</footer></main>
+<script id="bst-data" type="application/json">__BST_DATA__</script><script>
+const data=JSON.parse(document.getElementById('bst-data').textContent);
+const el=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=String(text);return n};
+const fmt=v=>v===null||v===undefined||v===''?'N/D':String(v);
+const sub=document.getElementById('subtitle');sub.textContent=data.computador+' • Diagnóstico gerado em '+data.geradoEm;
+const grid=document.getElementById('grid');
+if(!data.discos.length)grid.append(el('p','muted','Nenhum disco identificado pelo Windows.'));
+for(const d of data.discos){
+ const card=el('section','card');card.append(el('h2','',d.modelo||'Disco sem identificação'));
+ card.append(el('span','state','Estado Windows: '+fmt(d.estado)));
+ const title=el('div','muted','Vida útil restante (quando informada pelo SSD)');title.style.marginTop='16px';card.append(title);
+ const metric=el('div','metric',d.vidaRestante===null?'N/D':d.vidaRestante+'%');card.append(metric);
+ const bar=el('div','bar');const fill=el('div','fill');fill.style.width=(d.vidaRestante===null?0:Math.max(0,Math.min(100,d.vidaRestante)))+'%';if(d.vidaRestante!==null&&d.vidaRestante<30)fill.className='fill bad';else if(d.vidaRestante!==null&&d.vidaRestante<70)fill.className='fill warn';bar.append(fill);card.append(bar);
+ const meta=el('div','meta');for(const [k,v] of [['Tipo',d.tipo],['Capacidade',d.capacidadeGB+' GB'],['Temperatura',d.temperatura===null?'N/D':d.temperatura+' °C'],['Horas ligado',d.horas===null?'N/D':d.horas+' h'],['Desgaste SMART',d.desgaste===null?'N/D':d.desgaste+'%'],['Erros leitura / gravação',fmt(d.errosLeitura)+' / '+fmt(d.errosGravacao)]]){const box=el('div');box.append(el('span','muted',k));box.append(el('strong','',v));meta.append(box)}card.append(meta);grid.append(card);
+}
+</script></body></html>
+'@
+    $html = $html.Replace('__BST_DATA__', $json)
+    $destino = Join-Path $pasta 'BST-DiskHealth.html'
+    [System.IO.File]::WriteAllText($destino, $html, (New-Object System.Text.UTF8Encoding($false)))
+    $jsonPath = Join-Path $pasta 'BST-DiskHealth.json'
+    [System.IO.File]::WriteAllText($jsonPath, (ConvertTo-Json -InputObject $dados -Depth 6), (New-Object System.Text.UTF8Encoding($false)))
+    Write-Host "Relatorio HTML: $destino" -ForegroundColor Green
+    Write-Host "Dados JSON: $jsonPath" -ForegroundColor Green
+    Start-Process -FilePath $destino
+}
+
 Preparar-BST
 try { $programas = @(Ler-Catalogo) } catch { Write-Host $_ -ForegroundColor Red; Read-Host 'ENTER para sair'; exit 1 }
 while ($true) {
@@ -1304,6 +1382,7 @@ while ($true) {
     for ($i = 0; $i -lt $programas.Count; $i++) { Write-Host ('[{0}] {1}' -f ($i + 1), $programas[$i].nome) }
     Write-Host '[A] Verificar/atualizar programas instalados'
     Write-Host '[L] Limpeza e otimizacao do Windows'
+    Write-Host '[D] Saude dos SSDs / HDs - painel grafico'
     Write-Host '[R] Recarregar catalogo'
     Write-Host '[0] Sair'
     $opcao = (Read-Host 'Escolha (ex.: 1,2,3)').Trim()
@@ -1315,6 +1394,11 @@ while ($true) {
     }
     if ($opcao -match '^[lL]$') {
         Menu-LimpezaBST
+        continue
+    }
+    if ($opcao -match '^[dD]$') {
+        try { Abrir-DiskHealthBST } catch { Write-Host "Falha no diagnostico: $($_.Exception.Message)" -ForegroundColor Red }
+        Read-Host 'ENTER para voltar ao menu'
         continue
     }
     if ($opcao -match '^[rR]$') {
